@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Plugin
+metadata:
+  author: lidd95
+  name: CoinPlugin
+  repository: ''
+  version: 0.1.0
+  description:
+    en_US: coin select
+    zh_Hans: coin select
+  label:
+    en_US: CoinPlugin
+    zh_Hans: CoinPlugin
+  icon: assets/icon.svg
+spec:
+  config: []
+  components:
+    Command:
+      fromDirs:
+      - path: components/commands/
+    EventListener:
+      fromDirs:
+      - path: components/event_listener/
+execution:
+  python:
+    path: main.py
+    attr: CoinPlugin
