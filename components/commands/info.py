@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from typing import Any, AsyncGenerator
+import aiohttp
+import json
 
 from langbot_plugin.api.definition.components.command.command import Command, Subcommand
 from langbot_plugin.api.entities.builtin.command.context import ExecuteContext, CommandReturn
+from langbot_plugin.api.entities.builtin.platform.message import MessageChain, Plain
 
 
 class Info(Command):
@@ -13,4 +16,549 @@ class Info(Command):
     async def initialize(self):
         await super().initialize()
         
-        "Fill with your code here"
+        # Define the command handler function
+        async def info_handler(context: ExecuteContext) -> CommandReturn:
+            # Get the arguments from the command
+            args = context.command_args
+            
+            if len(args) == 0:
+                # Show help message if no arguments provided
+                help_text = (
+                    "币价查询命令使用方法:\n"
+                    "/info <币种名称或符号>\n"
+                    "例如: /info bitcoin, /info btc, /info ethereum\n"
+                    "\n或者查询多种币种: /info btc eth doge"
+                )
+                return CommandReturn(
+                    message_chain=MessageChain([Plain(text=help_text)])
+                )
+            else:
+                # Process the coin names provided
+                coins = [arg.lower() for arg in args]
+                
+                # Try to map common names to API IDs
+                coin_mapping = {
+                    'btc': 'bitcoin',
+                    'bitcoin': 'bitcoin',
+                    'eth': 'ethereum',
+                    'ethereum': 'ethereum',
+                    'sol': 'solana',
+                    'solana': 'solana',
+                    'doge': 'dogecoin',
+                    'dogecoin': 'dogecoin',
+                    'xrp': 'ripple',
+                    'ripple': 'ripple',
+                    'ada': 'cardano',
+                    'cardano': 'cardano',
+                    'ltc': 'litecoin',
+                    'litecoin': 'litecoin',
+                    'matic': 'polygon',
+                    'polygon': 'polygon',
+                    'bch': 'bitcoin-cash',
+                    'bitcoin-cash': 'bitcoin-cash',
+                    'link': 'chainlink',
+                    'chainlink': 'chainlink',
+                    'dot': 'polkadot',
+                    'polkadot': 'polkadot',
+                    'xmr': 'monero',
+                    'monero': 'monero',
+                    'etc': 'ethereum-classic',
+                    'ethereum-classic': 'ethereum-classic',
+                    'trx': 'tron',
+                    'tron': 'tron',
+                    'near': 'near',
+                    'fil': 'filecoin',
+                    'filecoin': 'filecoin',
+                    'apt': 'aptos',
+                    'aptos': 'aptos',
+                    'atom': 'cosmos',
+                    'cosmos': 'cosmos',
+                    'stx': 'stacks',
+                    'stacks': 'stacks',
+                    'algo': 'algorand',
+                    'algorand': 'algorand',
+                    'vet': 'vechain',
+                    'vechain': 'vechain',
+                    'icp': 'internet-computer',
+                    'shib': 'shiba-inu',
+                    'shiba-inu': 'shiba-inu',
+                    'pepe': 'pepe',
+                    'floki': 'floki',
+                    'uniswap': 'uniswap',
+                    'uni': 'uniswap',
+                    'aave': 'aave',
+                    'comp': 'compound-governance-token',
+                    'compound': 'compound-governance-token',
+                    'mana': 'decentraland',
+                    'sand': 'the-sandbox',
+                    'axs': 'axie-infinity',
+                    'chz': 'chiliz',
+                    'enj': 'enjincoin',
+                    'theta': 'theta-token',
+                    'ftm': 'fantom',
+                    'fantom': 'fantom',
+                    'xtz': 'tezos',
+                    'tezos': 'tezos',
+                    'btt': 'bittorrent',
+                    'kcs': 'kucoin-shares',
+                    'hbar': 'hedera',
+                    'hedera': 'hedera',
+                    'iota': 'iota',
+                    'zec': 'zcash',
+                    'zcash': 'zcash',
+                    'dash': 'dash',
+                    'cro': 'cronos',
+                    'cronos': 'cronos',
+                    'egld': 'elrond-erd-2',
+                    'elrond': 'elrond-erd-2',
+                    'klay': 'klaytn',
+                    'kda': 'kadena',
+                    'loom': 'loom-network',
+                    'rune': 'thorchain',
+                    'tomo': 'tomochain',
+                    'waves': 'waves',
+                    'zil': 'zilliqa',
+                    'zen': 'horizen',
+                    'sc': 'siacoin',
+                    'gala': 'gala',
+                    'imx': 'immutable-x',
+                    'stx': 'stacks',
+                    'mina': 'mina-protocol',
+                    'rose': 'oasis-network',
+                    'srm': 'serum',
+                    'ocean': 'ocean-protocol',
+                    'bal': 'balancer',
+                    'rlc': 'iexec-rlc',
+                    'snx': 'havven',
+                    'ren': 'republic-protocol',
+                    'lrc': 'loopring',
+                    'bnt': 'bancor',
+                    'uma': 'uma',
+                    'yfi': 'yearn-finance',
+                    'crv': 'curve-dao-token',
+                    'band': 'band-protocol',
+                    'oxt': 'orchid',
+                    'cvc': 'civic',
+                    'storj': 'storj',
+                    'bat': 'basic-attention-token',
+                    'zrx': '0x',
+                    'ht': 'huobi-token',
+                    'okb': 'okb',
+                    'leo': 'bitfinex-leo-token',
+                    'coti': 'coti',
+                    'ont': 'ontology',
+                    'neo': 'neo',
+                    'xlm': 'stellar',
+                    'stellar': 'stellar',
+                    'usdc': 'usd-coin',
+                    'usdt': 'tether',
+                    'busd': 'binance-usd',
+                    'dai': 'dai',
+                    'frax': 'frax',
+                    'lusd': 'liquity-usd',
+                    'tusd': 'true-usd',
+                    'pax': 'paxos-standard',
+                    'gusd': 'gemini-dollar',
+                    'alusd': 'alchemix-usd',
+                    'fei': 'fei-usd',
+                    'tribe': 'tribe-2',
+                    'mim': 'magic-internet-money',
+                    'ohm': 'olympus',
+                    'cvx': 'convex-finance',
+                    'spell': 'spell-token',
+                    'tricrypto': 'tricrypto-2',
+                    'pickle': 'pickle-finance',
+                    'badger': 'badger-dao',
+                    'cream': 'cream-2',
+                    'sushi': 'sushi',
+                    'sushiswap': 'sushi',
+                    'cake': 'pancakeswap-token',
+                    'pancake': 'pancakeswap-token',
+                    '1inch': '1inch',
+                    'inch': '1inch',
+                    'zks': 'zkspace',
+                    'zksync': 'zksync',
+                    'metis': 'metis-token',
+                    'movr': 'moonriver',
+                    'moonriver': 'moonriver',
+                    'movd': 'moonbeam',
+                    'moonbeam': 'moonbeam',
+                    'glm': 'golem',
+                    'rep': 'augur',
+                    'ankr': 'ankr',
+                    'alpha': 'alpha-finance',
+                    'sxp': 'swipe',
+                    'inj': 'injective-protocol',
+                    'vidt': 'vivid-token',
+                    'celr': 'celer-network',
+                    'rsr': 'reserve-rights-token',
+                    'mkr': 'maker',
+                    'maker': 'maker',
+                    'lqty': 'liquity',
+                    'fxs': 'frax-share',
+                    'torn': 'tornado-cash',
+                    'mask': 'mask-network',
+                    'super': 'super-farm',
+                    'bondly': 'bondly',
+                    'perl': 'perlin',
+                    'reef': 'reef-finance',
+                    'sfp': 'safepal',
+                    'dodo': 'dodo',
+                    'bake': 'bakerytoken',
+                    'ten': 'ten-x',
+                    'dgb': 'digibyte',
+                    'rvn': 'ravencoin',
+                    'nkn': 'nkn',
+                    'hot': 'holotoken',
+                    'edo': 'eidoo',
+                    'ant': 'aragon',
+                    'uma': 'universal-market-access',
+                    'ctsi': 'cartesi',
+                    'dock': 'dock',
+                    'ogn': 'origin-protocol',
+                    'dnt': 'district0x',
+                    'fun': 'funfair',
+                    'srn': 'sirin-labs-token',
+                    'qnt': 'quant-network',
+                    'elamachain': 'elamachain',
+                    'firo': 'firo',
+                    'sys': 'syscoin',
+                    'grt': 'the-graph',
+                    'loom': 'loom-network-new',
+                    'scrt': 'secret',
+                    'xvg': 'verge',
+                    'steem': 'steem',
+                    'hive': 'hive-blockchain',
+                    'hnt': 'helium',
+                    'fct': 'factom',
+                    'ardr': 'ardor',
+                    'nxt': 'nxt',
+                    'part': 'particl',
+                    'nav': 'nav-coin',
+                    'xzc': 'zcoin',
+                    'cloak': 'cloakcoin',
+                    'gamecredits': 'gamecredits',
+                    'nmc': 'namecoin',
+                    'via': 'viacoin',
+                    'blkc': 'blackcoin',
+                    'uno': 'unoswap',
+                    'yoyow': 'yoyow',
+                    'shift': 'shift',
+                    'ardr': 'ardor',
+                    'pivx': 'pivx',
+                    'blk': 'blackcoin',
+                    'bela': 'belacoin',
+                    'start': 'startcoin',
+                    'pot': 'potcoin',
+                    'mona': 'monacoin',
+                    'mue': 'monetaryunit',
+                    'pink': 'pinkcoin',
+                    'slr': 'solarcoin',
+                    'emercoin': 'emercoin',
+                    'vivo': 'vivo',
+                    'excl': 'exclusivecoin',
+                    'flax': 'flaxcoin',
+                    'ccx': 'conceal',
+                    'zel': 'zelcash',
+                    'crc': 'crowncoin',
+                    'polyx': 'polymesh',
+                    'phnx': 'phoenix-global',
+                    'xpx': 'proximax',
+                    'ardr': 'ardor',
+                    'nano': 'nano',
+                    'iotx': 'iotex',
+                    'tfuel': 'theta-fuel',
+                    'one': 'harmony',
+                    'sol': 'solana',
+                    'ada': 'cardano',
+                    'avax': 'avalanche-2',
+                    'avalanche': 'avalanche-2',
+                    'fuse': 'fuse-network-token',
+                    'xdai': 'xdai',
+                    'celo': 'celo',
+                    'metis': 'metisdao',
+                    'movr': 'moonriver',
+                    'aurora': 'aurora-near',
+                    'rose': 'oasis-rose',
+                    'tlos': 'telos',
+                    'boba': 'boba-network',
+                    'sys': 'syscoin',
+                    'erg': 'ergo',
+                    'kmd': 'komodo',
+                    'hns': 'handshake',
+                    'mobile': 'mobilecoin',
+                    'firo': 'firo',
+                    'loki': 'loki',
+                    'xhv': 'haven',
+                    'ae': 'aeternity',
+                    'qtum': 'qtum',
+                    'hc': 'hypercash',
+                    'zil': 'zilliqa',
+                    'stratis': 'stratis',
+                    'nebl': 'neblio',
+                    'lbc': 'lbry-credits',
+                    'cloak': 'cloakcoin',
+                    'monero': 'monero',
+                    'dash': 'dash',
+                    'zcash': 'zcash',
+                    'horizen': 'horizen',
+                    'komodo': 'komodo',
+                    'gin': 'gin-token',
+                    'rdd': 'redd',
+                    'ppc': 'peercoin',
+                    'ftc': 'feathercoin',
+                    'nmc': 'namecoin',
+                    'via': 'viacoin',
+                    'grs': 'groestlcoin',
+                    'blk': 'blackcoin',
+                    'dmd': 'diamond',
+                    'xpm': 'primecoin',
+                    'mona': 'monacoin',
+                    'mue': 'monetaryunit',
+                    'vrc': 'vericoin',
+                    'cure': 'curecoin',
+                    'excl': 'exclusivecoin',
+                    'flax': 'flaxcoin',
+                    'ccx': 'conceal',
+                    'zel': 'zelcash',
+                    'crc': 'crowncoin',
+                    'vivo': 'vivo',
+                    'pivx': 'pivx',
+                    'pink': 'pinkcoin',
+                    'slr': 'solarcoin',
+                    'emercoin': 'emercoin',
+                    'xzc': 'zcoin',
+                    'start': 'startcoin',
+                    'pot': 'potcoin',
+                    'blkc': 'blackcoin',
+                    'uno': 'unoswap',
+                    'yoyow': 'yoyow',
+                    'shift': 'shift',
+                    'belacoin': 'belacoin',
+                    'gamecredits': 'gamecredits',
+                    'nbt': 'netswap',
+                    'bela': 'belacoin',
+                    'blazr': 'blazercoin',
+                    'ccn': 'cannacoin',
+                    'dem': 'deutsche-emark',
+                    'dgc': 'digitalcoin',
+                    'dope': 'dopecoin',
+                    'emc': 'emercoin',
+                    'emc2': 'einsteinium',
+                    'fair': 'faircoin',
+                    'flo': 'florincoin',
+                    'frk': 'franko',
+                    'frq': 'frequency',
+                    'gbyte': 'bytes',
+                    'hkg': 'hacker-gold',
+                    'hpc': 'happycoin',
+                    'hyp': 'hyper-tube',
+                    'kore': 'korecoin',
+                    'lana': 'lanacoin',
+                    'lmc': 'luckyminer',
+                    'mint': 'mintcoin',
+                    'mnx': 'minexcoin',
+                    'mry': 'murraycoin',
+                    'myr': 'myriad',
+                    'nagacoin': 'nagacoin',
+                    'nrb': 'noir',
+                    'op': 'optimism',
+                    'optimism': 'optimism',
+                    'op': 'optimism',
+                    'optimism': 'optimism',
+                    'arb': 'arbitrum',
+                    'arbitrum': 'arbitrum',
+                    'arb': 'arbitrum',
+                    'arbitrum': 'arbitrum',
+                    'ldo': 'lido-dao',
+                    'lido': 'lido-dao',
+                    'aergo': 'aergo',
+                    'ardr': 'ardor',
+                    'nuls': 'nuls',
+                    'wicc': 'waykichain',
+                    'bix': 'bibox-token',
+                    'cmt': 'cybermiles',
+                    'egt': 'egretia',
+                    'hmc': 'harmony-blockchain',
+                    'hot': 'holotoken',
+                    'ins': 'insolar',
+                    'ion': 'ion',
+                    'key': 'key',
+                    'pst': 'primas',
+                    'qsp': 'quantstamp',
+                    'rct': 'realchain',
+                    'smt': 'smartmesh',
+                    'soc': 'soda-coin',
+                    'srn': 'sirin-labs-token',
+                    'ctxc': 'cortex',
+                    'grs': 'groestlcoin',
+                    'hush': 'hush',
+                    'lbtc': 'lightning-bitcoin',
+                    'ltcu': 'litecoin-ultra',
+                    'mcar': 'mastercar',
+                    'nper': 'nper',
+                    'pma': 'puma-pay',
+                    'rby': 'rubycoin',
+                    'safe': 'saferpay',
+                    'sfr': 'safex-cash',
+                    'slt': 'saltpay',
+                    'sphr': 'sphere',
+                    'star': 'starbase',
+                    'storm': 'storm',
+                    'tkn': 'tokencard',
+                    'utk': 'utrust',
+                    'via': 'viacoin',
+                    'vivo': 'vivo',
+                    'wgr': 'wagerr',
+                    'xrd': 'radix',
+                    'xseeds': 'xseeds',
+                    'ycc': 'yuan-chain-coin',
+                    'zai': 'zedxion',
+                    'zco': 'zcore',
+                    'zel': 'zelcash',
+                    'zpt': 'zeepin',
+                    'zyl': 'zynecoin',
+                    'bix': 'bibox-token',
+                    'cmt': 'cybermiles',
+                    'egt': 'egretia',
+                    'hmc': 'harmony-blockchain',
+                    'hot': 'holotoken',
+                    'ins': 'insolar',
+                    'ion': 'ion',
+                    'key': 'key',
+                    'pst': 'primas',
+                    'qsp': 'quantstamp',
+                    'rct': 'realchain',
+                    'smt': 'smartmesh',
+                    'soc': 'soda-coin',
+                    'srn': 'sirin-labs-token',
+                    'ctxc': 'cortex',
+                    'grs': 'groestlcoin',
+                    'hush': 'hush',
+                    'lbtc': 'lightning-bitcoin',
+                    'ltcu': 'litecoin-ultra',
+                    'mcar': 'mastercar',
+                    'nper': 'nper',
+                    'pma': 'puma-pay',
+                    'rby': 'rubycoin',
+                    'safe': 'saferpay',
+                    'sfr': 'safex-cash',
+                    'slt': 'saltpay',
+                    'sphr': 'sphere',
+                    'star': 'starbase',
+                    'storm': 'storm',
+                    'tkn': 'tokencard',
+                    'utk': 'utrust',
+                    'via': 'viacoin',
+                    'vivo': 'vivo',
+                    'wgr': 'wagerr',
+                    'xrd': 'radix',
+                    'xseeds': 'xseeds',
+                    'ycc': 'yuan-chain-coin',
+                    'zai': 'zedxion',
+                    'zco': 'zcore',
+                    'zel': 'zelcash',
+                    'zpt': 'zeepin',
+                    'zyl': 'zynecoin'
+                }
+                
+                # Map the provided coin names to actual coin IDs
+                coin_ids = []
+                unknown_coins = []
+                
+                for coin in coins:
+                    if coin in coin_mapping:
+                        coin_ids.append(coin_mapping[coin])
+                    else:
+                        unknown_coins.append(coin)
+                
+                # Remove duplicates while preserving order
+                coin_ids = list(dict.fromkeys(coin_ids))
+                
+                if not coin_ids:
+                    error_text = f"无法识别提供的币种: {', '.join(unknown_coins)}\n请尝试使用标准的币种名称或符号。"
+                    return CommandReturn(
+                        message_chain=MessageChain([Plain(text=error_text)])
+                    )
+                
+                # Fetch prices from CoinGecko API
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        # Format coin IDs for the API request
+                        coins_param = ','.join(set(coin_ids))
+                        
+                        url = f"https://api.coingecko.com/api/v3/simple/price?ids={coins_param}&vs_currencies=usd,cny&include_market_cap=true&include_24hr_change=true"
+                        
+                        async with session.get(url) as response:
+                            if response.status == 200:
+                                data = await response.json()
+                                
+                                if not data:
+                                    error_text = "未能获取到币价信息，请稍后重试。"
+                                    return CommandReturn(
+                                        message_chain=MessageChain([Plain(text=error_text)])
+                                    )
+                                
+                                # Format response
+                                result_lines = ["币价信息:"]
+                                
+                                for coin_id in coin_ids:
+                                    if coin_id in data:
+                                        coin_data = data[coin_id]
+                                        
+                                        usd_price = coin_data.get('usd', 'N/A')
+                                        cny_price = coin_data.get('cny', 'N/A')
+                                        market_cap = coin_data.get('usd_market_cap', 'N/A')
+                                        change_24h = coin_data.get('usd_24h_change', 'N/A')
+                                        
+                                        # Format prices nicely
+                                        if isinstance(usd_price, float):
+                                            usd_price_str = f"${usd_price:,.4f}" if usd_price < 0.01 else f"${usd_price:,.2f}"
+                                        else:
+                                            usd_price_str = str(usd_price)
+                                            
+                                        if isinstance(cny_price, float):
+                                            cny_price_str = f"¥{cny_price:,.4f}" if cny_price < 0.1 else f"¥{cny_price:,.2f}"
+                                        else:
+                                            cny_price_str = str(cny_price)
+                                        
+                                        if isinstance(market_cap, float):
+                                            market_cap_str = f"市值: ${market_cap:,.0f}"
+                                        else:
+                                            market_cap_str = f"市值: {market_cap}"
+                                        
+                                        if isinstance(change_24h, float):
+                                            change_24h_str = f"{change_24h:+.2f}%"
+                                        else:
+                                            change_24h_str = str(change_24h)
+                                        
+                                        coin_name = coin_id.replace('-', ' ').title()
+                                        result_lines.append(
+                                            f"{coin_name}: {usd_price_str} (USD) | {cny_price_str} (CNY) "
+                                            f"| 24h: {change_24h_str}"
+                                        )
+                                    else:
+                                        result_lines.append(f"{coin_id.title()}: 价格信息不可用")
+                                
+                                if unknown_coins:
+                                    result_lines.append(f"\n未找到: {', '.join(unknown_coins)}")
+                                
+                                result_text = "\n".join(result_lines)
+                                
+                                return CommandReturn(
+                                    message_chain=MessageChain([Plain(text=result_text)])
+                                )
+                            else:
+                                error_text = f"获取币价信息失败，错误代码: {response.status}"
+                                return CommandReturn(
+                                    message_chain=MessageChain([Plain(text=error_text)])
+                                )
+                except Exception as e:
+                    error_text = f"获取币价信息时发生错误: {str(e)}"
+                    return CommandReturn(
+                        message_chain=MessageChain([Plain(text=error_text)])
+                    )
+
+                # Store the handler for later use
+        # The command will be registered by the LangBot framework based on the class structure
+        self._command_handler = info_handler

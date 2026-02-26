@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from langbot_plugin.api.definition.components.common.event_listener import EventListener
 from langbot_plugin.api.entities import events, context
+from langbot_plugin.api.entities.builtin.platform.message import MessageChain, Plain
+import aiohttp
+import json
 
 
 class DefaultEventListener(EventListener):
@@ -11,25 +14,140 @@ class DefaultEventListener(EventListener):
     async def initialize(self):
         await super().initialize()
         
-        "Fill with your code here"
         @self.handler(events.PersonMessageReceived)
-        async def handler(event_context: context.EventContext):
-            print("Hello LangBot Plugin!")
-            print(event_context)
+        async def handle_person_message(event_context: context.EventContext):
+            # Check if the message starts with /
+            message_text = str(event_context.event.message_chain)
             
-            await event_context.reply(
-                platform_message.MessageChain([
-                    platform_message.Plain(text=f"Hello from Nahida Plugin!"),
-                ])
-            )
-
-            @self.handler(events.GroupMessageReceived)
-            async def handlerGroup(event_context: context.EventContext):
-                print("Hello LangBot Plugin!")
+            if message_text.startswith('/'):
+                # Extract the command (remove the leading /)
+                command = message_text[1:].strip()
+                
+                if command:
+                    # Call the external API
+                    try:
+                        async with aiohttp.ClientSession() as session:
+                            # Prepare the request payload
+                            payload = {
+                                "data": {
+                                    "msg": {
+                                        "content": f"/{command}"
+                                    }
+                                }
+                            }
+                            
+                            # Make the request to the external API
+                            async with session.post(
+                                "http://43.133.54.53:5000/processMsg",
+                                json=payload
+                            ) as response:
+                                if response.status == 200:
+                                    # Parse the response
+                                    result = await response.json()
+                                    
+                                    # Extract content from response
+                                    content = result.get('content', '未获取到响应内容')
+                                    
+                                    # Send the response back to the user
+                                    await event_context.reply(
+                                        MessageChain([
+                                            Plain(text=content)
+                                        ])
+                                    )
+                                    
+                                    # Prevent the message from being processed further
+                                    event_context.is_prevent_default = True
+                                    event_context.is_prevent_postorder = True
+                                else:
+                                    error_text = f"API 调用失败，错误代码: {response.status}"
+                                    await event_context.reply(
+                                        MessageChain([Plain(text=error_text)])
+                                    )
+                                    event_context.is_prevent_default = True
+                                    event_context.is_prevent_postorder = True
+                    except Exception as e:
+                        error_text = f"调用 API 时发生错误: {str(e)}"
+                        await event_context.reply(
+                            MessageChain([Plain(text=error_text)])
+                        )
+                        event_context.is_prevent_default = True
+                        event_context.is_prevent_postorder = True
+            else:
+                # Not a command message, just print for debugging
+                print("Received person message!")
                 print(event_context)
                 
                 await event_context.reply(
-                    platform_message.MessageChain([
-                        platform_message.Plain(text=f"Hello from Nahida Plugin!"),
+                    MessageChain([
+                        Plain(text=f"Hello from CoinPlugin! Use /btc to query prices."),
+                    ])
+                )
+
+        @self.handler(events.GroupMessageReceived)
+        async def handle_group_message(event_context: context.EventContext):
+            # Check if the message starts with /
+            message_text = str(event_context.event.message_chain)
+            
+            if message_text.startswith('/'):
+                # Extract the command (remove the leading /)
+                command = message_text[1:].strip()
+                
+                if command:
+                    # Call the external API
+                    try:
+                        async with aiohttp.ClientSession() as session:
+                            # Prepare the request payload
+                            payload = {
+                                "data": {
+                                    "msg": {
+                                        "content": f"/{command}"
+                                    }
+                                }
+                            }
+                            
+                            # Make the request to the external API
+                            async with session.post(
+                                "http://43.133.54.53:5000/processMsg",
+                                json=payload
+                            ) as response:
+                                if response.status == 200:
+                                    # Parse the response
+                                    result = await response.json()
+                                    
+                                    # Extract content from response
+                                    content = result.get('content', '未获取到响应内容')
+                                    
+                                    # Send the response back to the group
+                                    await event_context.reply(
+                                        MessageChain([
+                                            Plain(text=content)
+                                        ])
+                                    )
+                                    
+                                    # Prevent the message from being processed further
+                                    event_context.is_prevent_default = True
+                                    event_context.is_prevent_postorder = True
+                                else:
+                                    error_text = f"API 调用失败，错误代码: {response.status}"
+                                    await event_context.reply(
+                                        MessageChain([Plain(text=error_text)])
+                                    )
+                                    event_context.is_prevent_default = True
+                                    event_context.is_prevent_postorder = True
+                    except Exception as e:
+                        error_text = f"调用 API 时发生错误: {str(e)}"
+                        await event_context.reply(
+                            MessageChain([Plain(text=error_text)])
+                        )
+                        event_context.is_prevent_default = True
+                        event_context.is_prevent_postorder = True
+            else:
+                # Not a command message, just print for debugging
+                print("Received group message!")
+                print(event_context)
+                
+                await event_context.reply(
+                    MessageChain([
+                        Plain(text=f"Hello from CoinPlugin! Use /btc to query prices."),
                     ])
                 )
